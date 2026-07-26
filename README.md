@@ -1,90 +1,95 @@
 # 3d-pipeline
 
-Пайплайн для создания рекламных изображений предметов в Blender **по описанию
-и референсам** — без работы руками в интерфейсе редактора.
+**Version 1.0**
 
-Вы описываете предмет словами и показываете референсы. Дальше на каждом шаге
-вам показывают **одну картинку с вариантами**, вы называете номер или говорите,
-что не так. Всё остальное — геометрия, материалы, свет, композиция, рендер,
-цветокоррекция — делает код.
+A Blender pipeline for advertising product renders **from a description and
+references** — no manual work in the editor UI.
 
-Библиотека предметно-независимая: композиция и свет считаются из измеренных
-габаритов объекта, а не подбираются на глаз под конкретную форму.
+You describe the object in words and show references. At every step you're
+shown **one image with several variants**, and you just name a number or say
+what's wrong. Everything else — geometry, materials, lighting, composition,
+rendering, color grading — is done by the code.
 
-## Что нужно
+The library is subject-agnostic: composition and lighting are computed from
+the object's measured bounding box, not eyeballed to fit a specific shape.
+
+## Requirements
 
 | | |
 |---|---|
-| Blender | 5.x (проверено на 5.2.0 LTS). В `PATH` либо в `$BLENDER` |
-| Python | 3.11+ для `check.py`, всё остальное живёт внутри Blender |
-| GPU | не обязателен, но финальный рендер на CPU дольше в разы |
+| Blender | 5.x (tested on 5.2.0 LTS). On `PATH` or in `$BLENDER` |
+| Python | 3.11+ for `check.py`; everything else runs inside Blender |
+| GPU | not required, but the final render is much slower on CPU |
 
-Живой открытый Blender нужен ровно в одном месте — снять ракурс с вьюпорта
-мышью (шаг 2), и то по желанию. Всё остальное идёт в фоне.
+A live, open Blender is needed in exactly one place — grabbing an angle from
+the viewport with the mouse (step 2), and even that is optional. Everything
+else runs headless.
 
-## Быстрый старт
+## Quick start
 
-Проверить, что всё работает — сквозной прогон всех шагов на тестовой сцене,
-около 2 минут:
+Verify that everything works — a full run of every step on a test scene,
+about 2 minutes:
 
 ```bash
 python3 check.py
 ```
 
-Посмотреть, что заготовка собирает из коробки:
+See what the template produces out of the box:
 
 ```bash
 blender -b --python template/make.py -- /tmp/t preview
 ```
 
-Начать свой предмет: скопируйте `template/` в свою папку и правьте четыре файла —
-`build.py` (форма), `sets.py` (материалы), `shot.py` (утверждённые числа),
-`make.py` (пульт). Подробно — в [template/README.md](template/README.md).
+Start your own object: copy `template/` into your own folder and edit four
+files — `build.py` (shape), `sets.py` (materials), `shot.py` (approved
+numbers), `make.py` (control panel). Details in
+[template/README.md](template/README.md).
 
-## Документация
+## Documentation
 
-| Файл | О чём |
+| File | About |
 |---|---|
-| [GUIDE.md](GUIDE.md) | **Начните отсюда.** Все шаги 0–6 по порядку: что происходит, что делает код, где нужны вы и что именно вы решаете |
-| [LIMITS.md](LIMITS.md) | Что этот пайплайн не умеет и где он врёт. Читать до того, как браться за задачу |
-| [template/README.md](template/README.md) | Заготовка нового проекта |
+| [GUIDE.md](GUIDE.md) | **Start here.** Steps 0–6 in order: what the code does, where you're needed, and what exactly you decide |
+| [LIMITS.md](LIMITS.md) | What this pipeline can't do and where it lies. Read before taking on a task |
+| [template/README.md](template/README.md) | New project scaffold |
 
-## Структура
+## Structure
 
 ```
-lib/          библиотека — общая для всех проектов, предметно-независимая
-template/     заготовка нового проекта: скопировать и править
-tests/        сквозной прогон на тестовой сцене
-check.py      одна команда, проверяющая репозиторий целиком
+lib/          library — shared across all projects, subject-agnostic
+template/     new project scaffold: copy and edit
+tests/        end-to-end run on a test scene
+check.py      one command that verifies the whole repository
 ```
 
-Библиотека:
+Library:
 
-| Модуль | Отвечает за |
+| Module | Responsible for |
 |---|---|
-| `scene.py` | пустая сцена, сохранение, чистка |
-| `camera.py` | ракурсы, съём ракурса с вьюпорта, лист ракурсов |
-| `frame.py` | **ядро**: композиция из измеренных габаритов — охват, сдвиг, фокус |
-| `materials.py` | процедурные материалы: кожа, нубук, металл, пластик, стекло, карбон, PBR из текстур |
-| `lighting.py` | свет в координатах камеры, фон, отражатели, готовый рекламный набор |
-| `variants.py` | сетка вариантов одной картинкой |
-| `render.py` | настройка рендера, пассы, сохранение PNG + EXR |
-| `post.py` | цветокоррекция по готовому EXR |
-| `exr_info.py` | чтение пассов из EXR чистым Python, без Blender |
-| `mosaic.py` | склейка плиток |
+| `scene.py` | empty scene, saving, cleanup |
+| `camera.py` | angles, grabbing an angle from the viewport, contact sheet |
+| `frame.py` | **core**: composition from measured bounding box — fill, offset, focus |
+| `materials.py` | procedural materials: leather, nubuck, metal, plastic, glass, carbon, PBR from textures |
+| `lighting.py` | lighting in camera-relative coordinates, backdrop, reflectors, a ready advertising rig |
+| `variants.py` | a variant grid as a single image |
+| `render.py` | render setup, passes, saving PNG + EXR |
+| `post.py` | color grading from a finished EXR |
+| `exr_info.py` | reading passes from EXR in plain Python, without Blender |
+| `mosaic.py` | tiling stitched into one image |
 
-## Главная идея
+## Core idea
 
-Композиция и свет **считаются из измеренных габаритов предмета в координатах
-камеры**, а не подбираются на глаз. «Предмет занимает 86% кадра» — это одно
-число `fill=0.86`, а не двадцать перерендеров с подгонкой дистанции. Источники
-света заданы в долях охвата кадра, поэтому один и тот же набор работает
-и на предмете размером 2 единицы, и на предмете размером 8.
+Composition and lighting are **computed from the object's measured bounding
+box in camera coordinates**, not eyeballed. "The object fills 86% of the
+frame" is a single number, `fill=0.86`, not twenty re-renders spent nudging
+the distance. Light sources are defined as fractions of frame coverage, so
+the same rig works on an object 2 units across and one 8 units across.
 
-Из этого следует практическое: **утверждённые числа живут в коде, а не в `.blend`**.
-Файл сцены мог быть сохранён до того, как вы сказали «вот так»; числа
-воспроизводят кадр всегда — в фоне, на другой машине, через полгода.
+The practical consequence: **approved numbers live in code, not in the
+`.blend` file**. The scene file may have been saved before you approved a
+look; the numbers reproduce the shot every time — headless, on another
+machine, six months later.
 
-## Лицензия
+## License
 
-MIT — см. [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).
