@@ -22,6 +22,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "lib"))
 
 import camera      # noqa: E402
+import diff        # noqa: E402
 import exr_info    # noqa: E402
 import frame       # noqa: E402
 import lighting    # noqa: E402
@@ -30,6 +31,7 @@ import mosaic      # noqa: E402
 import post        # noqa: E402
 import render      # noqa: E402
 import silhouette  # noqa: E402
+import telemetry   # noqa: E402
 import variants    # noqa: E402
 
 RESULTS = []
@@ -451,6 +453,118 @@ def main():
         mats = [m.name for m in bpy.data.objects["Body"].data.materials]
         assert mats and mats[0] != "_SilhouetteFlat", f"материал не восстановлен: {mats}"
         return {"labels": len(prof), "45%": prof.get("45%")}
+
+    # --- v1.2: допуск/вердикт, аудит референсов, многоракурсный силуэт -----
+    @check("silhouette.compare_tolerance")
+    def _():
+        ref = {"a": 10.0, "b": 20.0}
+        good = {"a": 10.5, "b": 19.0}       # ~5% и ~5% — в пределах 10%
+        bad = {"a": 10.5, "b": 30.0}        # b — 50% мимо
+        same = silhouette.compare(ref, ref, tolerance=0.1)
+        assert all(v["ok"] for v in same.values()), f"compare(x,x) обязан быть ok: {same}"
+        mixed = silhouette.compare(ref, bad, tolerance=0.1)
+        assert mixed["a"]["ok"] and not mixed["b"]["ok"], f"вердикт неверный: {mixed}"
+        bare = silhouette.compare(ref, good)
+        assert isinstance(bare["a"], float), "без tolerance обязано быть голое число"
+        return {"same": same, "mixed": mixed}
+
+    @check("silhouette.audit_references")
+    def _():
+        def wedge2(path, scale):
+            """Тот же клин, что и выше, но с управляемым масштабом ширины —
+            ровно то расхождение между референсами одного ракурса, которое
+            audit_references должен ловить (несогласованная дистанция/фокусное).
+            """
+            w, h = 40, 60
+            img = bpy.data.images.new("test_sil_audit", w, h, alpha=False)
+            px = [0.0, 0.0, 0.0, 1.0] * (w * h)
+            for disp_row in range(5, 55):
+                t = (disp_row - 5) / 49
+                half = max(1, min(w // 2 - 1, int(round((3 + 12 * t) * scale))))
+                y = h - 1 - disp_row
+                for x in range(w // 2 - half, w // 2 + half):
+                    base = y * w * 4 + x * 4
+                    px[base:base + 3] = [1.0, 1.0, 1.0]
+            img.pixels = px
+            img.filepath_raw = path
+            img.file_format = "PNG"
+            img.save()
+            bpy.data.images.remove(img)
+
+        paths = [out(f"_audit_{i}.png") for i in range(4)]
+        for p in paths[:3]:
+            wedge2(p, scale=1.0)          # три согласованных снимка
+        wedge2(paths[3], scale=1.8)       # один явно шире — «другая дистанция»
+
+        audit = silhouette.audit_references(paths, tolerance=0.15)
+        outliers = [p for p, v in audit.items() if v["outlier"]]
+        assert outliers == [paths[3]], f"неверно определён выброс: {outliers}"
+        return {"outliers": outliers}
+
+    @check("silhouette.flat_render_multiview")
+    def _():
+        front = silhouette.flat_render(out("_sil_front.png"), res=(80, 140), azimuth=0.0)
+        side = silhouette.flat_render(out("_sil_45.png"), res=(80, 140), azimuth=45.0)
+        p_front, p_side = silhouette.profile(front), silhouette.profile(side)
+        diffs = [abs(p_front[k] - p_side[k]) for k in p_front
+                 if p_front[k] is not None and p_side[k] is not None]
+        assert diffs and max(diffs) > 0.05, f"azimuth=45 не изменил силуэт: {diffs}"
+        return {"max_diff": round(max(diffs), 3)}
+
+    # --- v1.2: сравнение с прошлым утверждённым, журнал времени, дифф-гейт -
+    @check("mosaic.side_by_side")
+    def _():
+        import numpy as np
+        a = np.zeros((30, 40, 4), dtype=np.float32)
+        a[..., 0], a[..., 3] = 0.8, 1.0
+        b = np.zeros((30, 50, 4), dtype=np.float32)
+        b[..., 1], b[..., 3] = 0.8, 1.0
+        pa, pb = out("_sbs_a.png"), out("_sbs_b.png")
+        mosaic.save(a, pa)
+        mosaic.save(b, pb)
+        result = out("_sbs_out.png")
+        mosaic.side_by_side(pa, pb, result, labels=("prev", "curr"), gap=6)
+        got = mosaic.load(result)
+        assert got.shape[1] == 40 + 6 + 50, f"ширина не сумма исходных плюс отступ: {got.shape}"
+        left_mean = float(got[:30, :40, :3].mean())
+        right_mean = float(got[:30, 46:96, :3].mean())
+        assert left_mean > 0.1 and right_mean > 0.1, f"половины пустые: {left_mean}, {right_mean}"
+        return {"shape": got.shape, "left_mean": round(left_mean, 3), "right_mean": round(right_mean, 3)}
+
+    @check("telemetry.record_summary")
+    def _():
+        tdir = out("_telemetry")
+        os.makedirs(tdir, exist_ok=True)
+        telemetry.record(tdir, "looks", 2.0)
+        telemetry.record(tdir, "looks", 3.0)
+        telemetry.record(tdir, "light", 1.5)
+        s = telemetry.summary(tdir)
+        assert s["looks"]["count"] == 2 and abs(s["looks"]["seconds"] - 5.0) < 1e-6, s
+        assert s["light"]["count"] == 1, s
+        with telemetry.timed(tdir, "final"):
+            pass
+        s2 = telemetry.summary(tdir)
+        assert s2["final"]["count"] == 1, s2
+        return {"looks": s["looks"], "final": s2["final"]}
+
+    @check("diff.perceptual_diff")
+    def _():
+        import numpy as np
+        a = np.zeros((32, 32, 4), dtype=np.float32)
+        a[..., :3], a[..., 3] = 0.2, 1.0
+        pa, pb = out("_diff_a.png"), out("_diff_b.png")
+        mosaic.save(a, pa)
+        mosaic.save(a.copy(), pb)
+        same = diff.perceptual_diff(pa, pb, grid=(4, 4))
+        assert same["max"] == 0 and same["mean"] == 0, same
+
+        c = a.copy()
+        c[16:, 16:, :3] = 0.9
+        pc = out("_diff_c.png")
+        mosaic.save(c, pc)
+        changed = diff.perceptual_diff(pa, pc, grid=(4, 4))
+        assert changed["max"] > 0.3, changed
+        return {"same": same, "changed": changed}
 
     # --- шаг 6: пост --------------------------------------------------------
     @check("post.run")

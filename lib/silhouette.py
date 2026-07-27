@@ -94,13 +94,22 @@ def profile(path, fractions=None, thresh=0.06):
     return {label: width_at(f) for label, f in fractions.items()}
 
 
-def flat_render(path, res=(700, 1150), lens=60.0, fill=1.06):
-    """Плоский орто-силуэт текущей сцены: белые меши на чёрном фоне, анфас.
+def flat_render(path, res=(700, 1150), lens=60.0, fill=1.06,
+                azimuth=0.0, elevation=0.0):
+    """Плоский орто-силуэт текущей сцены: белые меши на чёрном фоне.
 
     Ставит свою камеру и материалы, потом возвращает исходные — вызывающий
-    код может продолжать со сценой как ни в чём не бывало. Ракурс — всегда
-    анфас (`azimuth=elevation=0`): силуэт сравнивается с референсом того же
-    ракурса, а не с утверждённым кадром `shot.py`.
+    код может продолжать со сценой как ни в чём не бывало. По умолчанию
+    ракурс — анфас (`azimuth=elevation=0`), как и раньше: силуэт сравнивается
+    с референсом того же ракурса, а не с утверждённым кадром `shot.py`.
+
+    `azimuth`/`elevation` (градусы, та же система, что у `camera.look_from`)
+    позволяют снять силуэт с другой стороны — например, 3/4 в дополнение
+    к анфасу, если для референса есть снимок этого же ракурса. Библиотека
+    не решает, какие ракурсы значимы для конкретного предмета — это
+    по-прежнему решение проекта, ровно как и подписи `fractions`. Это
+    по-прежнему не проверка 3D-формы целиком: несколько плоских проекций —
+    не то же самое, что объём, см. LIMITS.md.
     """
     subjects = frame.subjects()
     if not subjects:
@@ -129,7 +138,7 @@ def flat_render(path, res=(700, 1150), lens=60.0, fill=1.06):
         ob.data.materials.append(flat)
     lighting.world_flat(color=(0, 0, 0), strength=1.0)
 
-    camera.look_from(0, 0, 10.0, target=target, lens=lens)
+    camera.look_from(azimuth, elevation, 10.0, target=target, lens=lens)
     cam = bpy.context.scene.camera
     cam.data.type = "ORTHO"
     _, (y0, y1), _ = frame.extent()
@@ -158,16 +167,73 @@ def flat_render(path, res=(700, 1150), lens=60.0, fill=1.06):
     return path
 
 
-def compare(reference, render):
+def compare(reference, render, tolerance=None):
     """Расхождение двух профилей в процентах — таблица вместо «не похоже».
 
     Оба аргумента — результат `profile()`. Метка, которой нет в одном из двух
     (пустая строка силуэта на одном из снимков), даёт `None`, а не падение:
     отсутствие одной точки не должно ронять всё сравнение.
+
+    Без `tolerance` поведение прежнее — голое число расхождения в процентах.
+    С `tolerance` (доля, например `0.15`) каждая метка вместо числа даёт
+    словарь `{"diff": -3.2, "ok": True}` — решение «в пределах нормы или нет»
+    посчитано, а не остаётся каждый раз на человеке. Порог — не предметный,
+    живёт как параметр вызова, а не константа библиотеки, ровно как `fractions`.
     """
     out = {}
     for label, ref_v in reference.items():
         got_v = render.get(label)
-        out[label] = None if ref_v is None or got_v is None \
-            else round((got_v - ref_v) / ref_v * 100, 1)
+        if ref_v is None or got_v is None:
+            out[label] = None
+            continue
+        diff = round((got_v - ref_v) / ref_v * 100, 1)
+        out[label] = diff if tolerance is None \
+            else {"diff": diff, "ok": abs(diff) <= tolerance * 100}
+    return out
+
+
+def audit_references(paths, fractions=None, thresh=0.06, tolerance=0.15):
+    """Согласованность нескольких референсов ОДНОГО ракурса между собой.
+
+    Диагностированный на практике случай: расхождения, приписанные неточной
+    геометрии, на деле объяснялись несогласованной дистанцией/фокусным между
+    снимками одного объекта — и это видно уже по самим референсам, до того,
+    как потрачено время на форму. Прогонять на шаге 0, сразу после получения
+    референсов, до `build.py`.
+
+    Считает `profile()` каждого пути, затем медианный профиль по группе
+    (медиана, а не среднее — один выброс не должен сдвигать эталон, который
+    с ним же и сравнивается) и отклонение каждого кадра от медианы через
+    `compare(median, profile, tolerance=tolerance)`.
+
+    Возвращает `{path: {"profile": {...}, "diff": {...}, "outlier": bool}}`.
+    `outlier=True` — хотя бы одна метка вышла за `tolerance` относительно
+    медианы. Функция не судит, какой из кадров правильный, только показывает,
+    какой выбивается из группы.
+
+    Ограничение: сравнимо только внутри одного ракурса — снимки задуманы как
+    одна и та же поза/анфас. Референсы разных ракурсов между собой не
+    сравниваются здесь — для этого несколько вызовов `flat_render(azimuth=…)`
+    по отдельности, каждый со своим референсом того же ракурса.
+    """
+    if len(paths) < 2:
+        raise ValueError("нужно минимум два референса, чтобы сравнивать согласованность")
+
+    profiles = {p: profile(p, fractions=fractions, thresh=thresh) for p in paths}
+    labels = next(iter(profiles.values())).keys()
+
+    median = {}
+    for label in labels:
+        vals = sorted(v[label] for v in profiles.values() if v[label] is not None)
+        if not vals:
+            median[label] = None
+            continue
+        n = len(vals)
+        median[label] = vals[n // 2] if n % 2 else (vals[n // 2 - 1] + vals[n // 2]) / 2
+
+    out = {}
+    for p, prof in profiles.items():
+        diff = compare(median, prof, tolerance=tolerance)
+        outlier = any(v is not None and not v["ok"] for v in diff.values())
+        out[p] = {"profile": prof, "diff": diff, "outlier": outlier}
     return out

@@ -12,6 +12,13 @@
 
 Называется `make.py`, а не `render.py`, намеренно: свой каталог стоит в sys.path
 раньше библиотеки, и `render.py` рядом перекрыл бы `lib/render.py`.
+
+Каждый запуск пишет время стадии в `OUTDIR/run_log.jsonl` (`lib/telemetry.py`);
+`final` дополнительно печатает сводку по всем стадиям проекта. Если рядом
+с `OUTDIR` лежит `<stage>.approved.png` (утверждённый на прошлой итерации
+чекпоинт того же имени) — автоматически появляется `<stage>.compare.png`
+("approved"/"new") и предупреждение, если разница заметна (`lib/mosaic.py`,
+`lib/diff.py`).
 """
 import os
 import sys
@@ -23,15 +30,22 @@ sys.path.insert(0, HERE)
 
 import bpy               # noqa: E402
 import camera            # noqa: E402
+import diff              # noqa: E402
 import frame             # noqa: E402
 import lighting          # noqa: E402
+import mosaic            # noqa: E402
 import render as R       # noqa: E402
 import scene             # noqa: E402
+import telemetry         # noqa: E402
 import variants          # noqa: E402
 
 import build             # noqa: E402
 import sets              # noqa: E402
 import shot              # noqa: E402
+
+# Грубый порог для diff.perceptual_diff() (0..1 по каналу) — выше него
+# сравнение с <stage>.approved.png печатает предупреждение, а не просто число.
+DIFF_ALERT = 0.15
 
 
 def angles(outdir):
@@ -101,6 +115,30 @@ STAGES = {"angles": angles, "looks": looks, "light": light,
           "preview": preview, "final": final}
 
 
+def _compare_with_approved(outdir, stage, outputs):
+    """F: сравнение с прошлым утверждённым; H: грубый дифф-гейт поверх него.
+
+    Конвенция: утвердили чекпоинт — скопируйте его в `<stage>.approved.png`
+    в этой же папке (например, `looks.approved.png`). При следующем запуске
+    того же `stage` рядом с новым вариантом появится `<stage>.compare.png`
+    ("approved"/"new"), и если разница выше `DIFF_ALERT` — предупреждение.
+    Ничего не делает, если approved-файла ещё нет — это не обязательный шаг.
+    """
+    approved = join(outdir, f"{stage}.approved.png")
+    current = next((f for f in outputs if f.endswith(".png")), None)
+    if current is None or not os.path.exists(approved):
+        return
+    cmp_path = mosaic.side_by_side(approved, current,
+                                   join(outdir, f"{stage}.compare.png"),
+                                   labels=("approved", "new"))
+    d = diff.perceptual_diff(approved, current)
+    print(f"COMPARE {stage} vs approved -> {cmp_path} "
+          f"(max={d['max']:.3f} mean={d['mean']:.3f})")
+    if d["max"] > DIFF_ALERT:
+        print(f"WARNING: {stage} заметно отличается от approved "
+              f"(max={d['max']:.3f} > {DIFF_ALERT})")
+
+
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     if len(argv) < 2 or argv[1] not in STAGES:
@@ -111,7 +149,8 @@ def main():
     # Обязательно: `blender -b` без файла грузит СТАРТОВУЮ сцену — с кубом
     # и лампой. Оба честно попадут в кадр и в габариты объекта.
     scene.reset()
-    counts = build.build()
+    with telemetry.timed(outdir, "build"):
+        counts = build.build()
     print("BUILD polys:", sum(counts.values()))
 
     global DIST
@@ -121,8 +160,15 @@ def main():
     (x0, x1), (y0, y1), _ = frame.extent()
     DIST = 2.6 * max(x1 - x0, y1 - y0)
 
-    for f in STAGES[stage](outdir):
+    with telemetry.timed(outdir, stage):
+        outputs = STAGES[stage](outdir)
+    for f in outputs:
         print("OUT", f, os.path.getsize(f))
+
+    _compare_with_approved(outdir, stage, outputs)
+
+    if stage == "final":
+        print("TIME", telemetry.summary(outdir))
 
 
 main()

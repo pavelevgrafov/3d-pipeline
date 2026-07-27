@@ -1,6 +1,6 @@
 # 3d-pipeline
 
-**Version 1.1**
+**Version 1.2**
 
 A Blender pipeline for advertising product renders **from a description and
 references** — no manual work in the editor UI.
@@ -52,6 +52,8 @@ numbers), `make.py` (control panel). Details in
 | [GUIDE.md](GUIDE.md) | **Start here.** Steps 0–6 in order: what the code does, where you're needed, and what exactly you decide |
 | [LIMITS.md](LIMITS.md) | What this pipeline can't do and where it lies. Read before taking on a task |
 | [template/README.md](template/README.md) | New project scaffold |
+| [BACKLOG.md](BACKLOG.md) | Improvement hypotheses for future versions — cost, speed, accuracy, scaling to larger/animated/character work |
+| [SPEC.md](SPEC.md) | The spec this version (1.2) was implemented from |
 
 ## Structure
 
@@ -75,8 +77,10 @@ Library:
 | `render.py` | render setup, passes, saving PNG + EXR |
 | `post.py` | color grading from a finished EXR |
 | `exr_info.py` | reading passes from EXR in plain Python, without Blender |
-| `mosaic.py` | tiling stitched into one image |
-| `silhouette.py` | proportions vs. a reference, measured — a flat silhouette profile compared by the number, not by eye |
+| `mosaic.py` | tiling stitched into one image; `side_by_side()` compares a checkpoint against the last approved one |
+| `silhouette.py` | proportions vs. a reference, measured — a flat silhouette profile compared by the number, not by eye; multi-view, tolerance/verdict, and reference-consistency audit |
+| `telemetry.py` | append-only run log per project (`run_log.jsonl`) — time and repeat count per stage, no judgment attached |
+| `diff.py` | a rough perceptual diff between two renders — a downsampled-grid gate for "something visibly shifted" |
 
 ## Core idea
 
@@ -92,6 +96,35 @@ look; the numbers reproduce the shot every time — headless, on another
 machine, six months later.
 
 ## Changelog
+
+**1.2** — systems-engineering pass targeting iteration waste and an
+already-realized risk (inconsistent references before a paid geometry API
+call), from a backlog collected as a product-management review of the whole
+pipeline (see [BACKLOG.md](BACKLOG.md) / [SPEC.md](SPEC.md)):
+
+* `silhouette.compare(..., tolerance=)` — an optional pass/fail verdict next
+  to the percent diff, backward-compatible (omit it, get the bare number as
+  before).
+* `silhouette.audit_references()` — checks a group of same-angle references
+  for internal consistency (median profile, per-frame deviation) *before*
+  any geometry work starts.
+* `silhouette.flat_render(azimuth=, elevation=)` — an optional non-frontal
+  silhouette projection, still not a full 3D-shape check (see `LIMITS.md`).
+* A documented stop-gate pattern (`template/README.md`): a paid external API
+  (image-to-3D and similar) should only be called after `audit_references()`
+  passes — spend the free check before the paid one.
+* `mosaic.side_by_side()` — a labeled "before/after" comparison image.
+* `lib/telemetry.py` — an append-only per-project run log
+  (`run_log.jsonl`): time and repeat count per stage, no external
+  dependencies.
+* `lib/diff.py` — a rough perceptual diff (downsampled-grid, no PIL/heavy
+  deps) between two renders, as a "did this change more than expected" gate.
+* `template/make.py` now times every stage automatically and, when a
+  `<stage>.approved.png` is present, generates a comparison and a diff
+  warning against it.
+* A five-question applicability checklist added to `GUIDE.md`, step 0 —
+  fail fast at the task-framing stage, the cheapest point of failure in
+  the whole pipeline.
 
 **1.1** — added `lib/silhouette.py`: an optional early checkpoint that
 measures an object's silhouette against a reference numerically (percent
