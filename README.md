@@ -129,7 +129,7 @@ pipeline (see [BACKLOG.md](BACKLOG.md) / [SPEC.md](SPEC.md)):
 **1.1** — added `lib/silhouette.py`: an optional early checkpoint that
 measures an object's silhouette against a reference numerically (percent
 diff per height fraction) instead of relying on "looks off" — see
-[GUIDE.md, step 1.5](GUIDE.md#шаг-15-пропорции-по-желанию).
+[GUIDE.md, step 1.5](GUIDE.md#step-15-proportions-optional).
 
 **1.0** — first public release: `lib/`, `template/`, `check.py`.
 

@@ -14,7 +14,4 @@ __pycache__/
 .env
 
 # Личные рабочие файлы — не для публичного репозитория.
-BACKLOG.md
 PROGRESS.md
-SPEC.md
-LIMITS.md

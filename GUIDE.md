@@ -1,108 +1,111 @@
-# Пошаговое руководство
+# Step-by-step guide
 
-Для того, кто открыл этот репозиторий впервые и не работал в Blender.
-Здесь разобрано, что происходит на каждом шаге, что делает код, и — главное —
-**где нужны вы и что именно вы решаете**.
-
----
-
-## Как это устроено
-
-Пайплайн — это цикл из трёх действий, повторённый семь раз:
-
-```
-код собирает вариант  →  вам показывают одну картинку  →  вы говорите слово
-```
-
-Вы **никогда не двигаете мышью в Blender** и не подбираете числа. Вы смотрите
-на картинку и говорите: «второй», «слишком тускло», «разверни на четверть влево».
-Дальше это превращается в правку кода, и цикл повторяется.
-
-Три принципа, из которых следует всё остальное:
-
-**Смотреть, а не рассуждать.** Ни одно решение о свете, материале или кадре
-не принимается «по описанию». Каждое проверяется рендером. Дешёвое превью
-считается 5–10 секунд, поэтому посмотреть всегда быстрее, чем рассуждать.
-
-**Числа живут в коде.** Утверждённый ракурс — это четыре числа в `shot.py`,
-а не состояние `.blend`-файла. Файл сцены мог быть сохранён до того, как вы
-сказали «вот так». Числа воспроизводят кадр всегда: в фоне, на другой машине,
-через полгода.
-
-**Композиция считается, а не подбирается.** Габариты предмета измеряются
-в координатах камеры, и из них считаются охват кадра, сдвиг, фокус, диапазон
-тумана и положение каждого источника света. Поэтому один набор настроек
-работает на предмете любого размера.
+For someone opening this repository for the first time who has never worked
+in Blender. Here's what happens at each step, what the code does, and —
+most importantly — **where you're needed and what exactly you decide**.
 
 ---
 
-## Карта контрольных точек
+## How it works
 
-Столбец «ваше слово» — это буквально то, что от вас требуется. Всё остальное
-на этом шаге сделает код.
+The pipeline is a loop of three actions, repeated seven times:
 
-| Шаг | Что вы видите | Ваше слово | Время |
+```
+code builds a variant  →  you're shown one picture  →  you say a word
+```
+
+You **never move the mouse in Blender** and never dial in numbers. You look
+at a picture and say: "the second one", "too dim", "rotate a quarter turn
+left". That turns into a code edit, and the loop repeats.
+
+Three principles everything else follows from:
+
+**Look, don't reason.** No decision about light, material, or frame is made
+"from the description". Every one is checked by rendering. A cheap preview
+takes 5–10 seconds, so looking is always faster than reasoning.
+
+**Numbers live in code.** The approved angle is four numbers in `shot.py`,
+not the state of a `.blend` file. The scene file could have been saved
+before you said "like this". Numbers reproduce the shot every time: headless,
+on another machine, six months later.
+
+**Composition is computed, not eyeballed.** The object's bounding box is
+measured in camera coordinates, and from it the code computes frame
+coverage, offset, focus, fog range, and the position of every light source.
+That's why one set of settings works on an object of any size.
+
+---
+
+## Checkpoint map
+
+The "your word" column is literally all that's required of you. Everything
+else at that step is done by the code.
+
+| Step | What you see | Your word | Time |
 |---|---|---|---|
-| 0. Задача | — | описание предмета и референсы | ваше |
-| 0.5. Аудит референсов (опц.) | таблица чисел, не картинка | ничего — авто-проверка, останов при выбросе | ~1 с |
-| 1. Форма | серая глина с 12 сторон | «пропорции не те», «шире», «годится» | ~40 с |
-| 1.5. Пропорции (опц.) | таблица чисел, не картинка | ничего — авто-проверка | ~1 с |
-| 2. Ракурс | лист ракурсов либо ваш вьюпорт | номер ракурса **или** крутите мышью сами | ~40 с |
-| 3. Материалы | 4–6 наборов на вашем кадре | номер набора | ~60 с |
-| 4. Свет и кадр | 4 варианта одного параметра | номер варианта, «плотнее», «темнее» | ~10 с |
-| 5. Финал | готовый кадр в полном размере | «принято» либо назад на 3–4 | ~30 с/кадр |
-| 6. Грейд | тот же кадр с другой цветокоррекцией | «контрастнее», «убери виньетку» | ~1 с |
+| 0. The task | — | description of the object and references | yours |
+| 0.5. Reference audit (optional) | a table of numbers, not a picture | nothing — auto-check, stops on an outlier | ~1 s |
+| 1. Shape | grey clay from 12 sides | "proportions are off", "wider", "good" | ~40 s |
+| 1.5. Proportions (optional) | a table of numbers, not a picture | nothing — auto-check | ~1 s |
+| 2. Angle | a contact sheet of angles, or your own viewport | angle number **or** rotate it yourself | ~40 s |
+| 3. Materials | 4–6 sets on your frame | set number | ~60 s |
+| 4. Light and frame | 4 variants of one parameter | variant number, "tighter", "darker" | ~10 s |
+| 5. Final render | the finished frame at full size | "approved" or back to 3–4 | ~30 s/frame |
+| 6. Color grade | the same frame with different grading | "more contrast", "remove the vignette" | ~1 s |
 
-**Обязательные точки — 2 и 3.** Ракурс и материалы нельзя выбрать за вас:
-это и есть содержательное решение о том, как предмет выглядит. Шаги 1 и 4
-можно проскочить на значениях по умолчанию и вернуться к ним, если результат
-не понравился. Шаг 6 — по желанию.
-
----
-
-## Шаг 0. Задача
-
-**Делаете вы.** Опишите предмет словами и приложите референсы.
-
-Полезно назвать: что это за предмет, из чего сделан (материал каждой видимой
-части отдельно), какое настроение у кадра (тёмная реклама, светлый каталог,
-техничный разрез), пропорции кадра (квадрат, вертикаль 4:5, горизонт).
-
-Референсы работают как **образец настроения и света**, а не как чертёж:
-по картинке нельзя восстановить точные размеры. Если размеры важны —
-называйте их числами.
-
-Результат шага — файл `spec.md` рядом с проектом: короткое описание, которое
-потом легко сверить с готовым кадром.
-
-### Чеклист применимости задачи
-
-Прежде чем открывать `build.py` — пять вопросов, по одному на каждую строку
-таблицы «[Класс задач](LIMITS.md#класс-задач)». «Да» на любой из них — сигнал
-остановиться здесь, а не на середине геометрии: это либо отдельный инструмент,
-либо ручная работа, либо импорт готовой модели, но не то, на чём рассчитан
-этот пайплайн.
-
-1. Это персонаж, лицо или другая органика?
-2. Нужны ткань, жидкость, дым или разрушения?
-3. Нужна анимация или видео, а не неподвижный кадр?
-4. В кадре несколько предметов, где важна их компоновка **друг относительно
-   друга** — а не просто общий охват вокруг группы?
-5. Нужна чертёжная/CAD-точность (допуски, размерные цепочки)?
-
-Самая дешёвая точка отказа во всём пайплайне: остановиться здесь стоит
-секунды, остановиться на середине `build.py` — часы.
+**Mandatory checkpoints are 2 and 3.** Angle and materials can't be chosen
+for you: that's the substantive decision about how the object looks. Steps
+1 and 4 can be skipped on the defaults and revisited later if the result
+doesn't land. Step 6 is optional.
 
 ---
 
-## Шаг 0.5. Аудит референсов (по желанию)
+## Step 0. The task
 
-**Делает код.** Нужен, когда референсов несколько и они задуманы как один
-и тот же ракурс — например, шесть фотографий предмета анфас с разных
-дистанций или объективов. Расхождения между такими снимками легко приписать
-неточной геометрии на шаге 1, хотя на деле дело в самих референсах: разная
-дистанция или фокусное расстояние между кадрами уже даёт разный силуэт,
-независимо от того, что потом будет вылеплено.
+**You do this.** Describe the object in words and attach references.
+
+Worth naming: what the object is, what it's made of (material of each
+visible part separately), the mood of the shot (dark advertising, bright
+catalog, technical cutaway), the frame's aspect ratio (square, vertical
+4:5, landscape).
+
+References work as a **sample of mood and light**, not as a blueprint: you
+can't recover exact dimensions from a picture. If dimensions matter, state
+them as numbers.
+
+The result of this step is a `spec.md` file next to the project: a short
+description that's easy to check against the finished frame later.
+
+### Task-applicability checklist
+
+Before opening `build.py` — five questions, one per row of the "[Task
+class](LIMITS.md#task-class)" table. A "yes" to any of them is a signal to
+stop here, not partway through the geometry: it's either a separate tool,
+manual work, or importing a finished model, but not what this pipeline is
+built for.
+
+1. Is it a character, a face, or other organic form?
+2. Does it need cloth, liquid, smoke, or destruction?
+3. Does it need animation or video, not a still frame?
+4. Are there multiple objects in the frame where their arrangement
+   **relative to each other** matters — not just overall coverage around
+   the group?
+5. Does it need drafting/CAD precision (tolerances, dimension chains)?
+
+The cheapest point of failure in the whole pipeline: stopping here costs
+seconds, stopping partway through `build.py` costs hours.
+
+---
+
+## Step 0.5. Reference audit (optional)
+
+**The code does this.** Needed when there are several references intended
+to be the same angle — for example, six front-on photos of the object at
+different distances or focal lengths. Discrepancies between such shots are
+easy to blame on imprecise geometry at step 1, when the real cause is the
+references themselves: a different distance or focal length between frames
+already produces a different silhouette, regardless of what gets sculpted
+afterward.
 
 ```python
 import silhouette
@@ -114,371 +117,387 @@ for path, v in audit.items():
     print(path, "outlier" if v["outlier"] else "ok", v["diff"])
 ```
 
-`audit_references` не решает, какой из снимков «правильный» — только
-показывает, какой выбивается из группы по медиане. Прогонять до `build.py`:
-дешевле отбраковать плохой референс сейчас, чем переделывать форму под
-искажённые числа.
+`audit_references` doesn't decide which shot is "correct" — it only shows
+which one deviates from the group's median. Run it before `build.py`: it's
+cheaper to discard a bad reference now than to reshape geometry to fit
+distorted numbers.
 
-**Ваше слово:** ничего, это авто-проверка. Но при `outlier=True` — вернуться
-к референсам, а не к геометрии.
+**Your word:** nothing, this is an auto-check. But on `outlier=True` — go
+back to the references, not the geometry.
 
-> **Ограничение.** Сравнимо только **внутри одного ракурса** — снимки должны
-> быть одной и той же позой/анфасом. Референсы разных ракурсов между собой
-> не сравниваются здесь — см. [Шаг 1.5](#шаг-15-пропорции-по-желанию) про
-> многоракурсный силуэт.
+> **Limitation.** Only comparable **within a single angle** — the shots
+> must be the same pose/frontal view. References of different angles are
+> not compared to each other here — see [Step 1.5](#step-15-proportions-optional)
+> for a multi-view silhouette.
 
-### Стоп-гейт перед платным внешним API
+### Stop-gate before a paid external API
 
-Если проект вызывает платный сервис генерации геометрии (например,
-image-to-3D API) — вызывайте его **после** аудита референсов и только если
-выбросов нет. Деньги тратятся до проверки, а не после, если гейта нет:
+If a project calls a paid geometry-generation service (e.g. an
+image-to-3D API) — call it **after** the reference audit, and only if
+there are no outliers. Money gets spent before the check, not after, if
+there's no gate:
 
 ```python
 audit = silhouette.audit_references(ref_paths, tolerance=0.15)
 if any(v["outlier"] for v in audit.values()):
-    raise RuntimeError("референсы рассогласованы — см. audit; API не вызван")
-# только после этой проверки — вызов платного сервиса
+    raise RuntimeError("references are inconsistent — see audit; API not called")
+# only after this check — call the paid service
 ```
 
-Это не защита на уровне библиотеки — `lib/` ничего не знает о внешних
-сервисах и ключах, — а обязательный паттерн в коде проекта. Полный пример —
-[template/README.md](template/README.md#перед-вызовом-платного-внешнего-api).
+This isn't library-level protection — `lib/` knows nothing about external
+services or keys — but a mandatory pattern in the project's own code. Full
+example — [template/README.md](template/README.md#before-calling-a-paid-external-api).
 
 ---
 
-## Шаг 1. Форма
+## Step 1. Shape
 
-**Делает код.** Геометрия описывается в `build.py` примитивами и модификаторами:
-кубы, цилиндры, торы, вращение профиля, скругление рёбер. Ни материалов,
-ни света — только форма.
+**The code does this.** Geometry is described in `build.py` with primitives
+and modifiers: cubes, cylinders, tori, profile revolves, edge bevels. No
+materials, no light — shape only.
 
-Имена объектов (`Body`, `Face`, `Ring`) — это **интерфейс между файлами**:
-по ним `sets.py` раскладывает материалы, а `shot.py` целится светом
-и фокусом. Переименовали в одном месте — правьте и в другом.
+Object names (`Body`, `Face`, `Ring`) are the **interface between files**:
+`sets.py` assigns materials by them, and `shot.py` aims light and focus by
+them. Rename in one place — edit the other too.
 
 ```bash
 blender -b --python make.py -- /tmp/out angles
 ```
 
-**Вы видите** `angles.png` — предмет серой глиной с 12 сторон, по 30°.
-Материалы на этом шаге специально отключены: цвет и блики мешают увидеть,
-что силуэт кривой.
+**You see** `angles.png` — the object as grey clay from 12 sides, 30° apart.
+Materials are deliberately off at this step: color and highlights would
+hide a crooked silhouette.
 
-**Ваше слово.** Смотрите на пропорции и силуэт: «корпус слишком глубокий»,
-«скругление как обмылок», «ободок не читается». Параметры формы вынесены
-в начало `build.py` отдельными константами именно для того, чтобы такие
-правки были правкой одного числа.
+**Your word.** Look at proportions and silhouette: "the body's too deep",
+"the bevel looks melted", "the rim doesn't read". Shape parameters live at
+the top of `build.py` as separate constants precisely so edits like these
+are a one-number change.
 
-> **Здесь легко потерять время.** Не доводите форму до идеала на этом шаге.
-> Многое, что кажется неправильным на серой глине, исчезает под материалами
-> и светом — и наоборот. Достаточно, чтобы пропорции были верными.
+> **Easy to lose time here.** Don't polish the shape to perfection at this
+> step. A lot of what looks wrong on grey clay disappears under materials
+> and light — and vice versa. Getting the proportions right is enough.
 
 ---
 
-## Шаг 1.5. Пропорции (по желанию)
+## Step 1.5. Proportions (optional)
 
-**Делает код.** Нужен, когда «пропорции не те» с шага 1 — субъективная
-жалоба, которую больше не на чем проверить, кроме как переделать и
-посмотреть снова. `lib/silhouette.py` меняет это на число: порог по чёрному
-фону превращает референс и рендер в силуэт, а силуэт — в таблицу «ширина
-на такой-то доле высоты».
+**The code does this.** Needed when "proportions are off" from step 1 is
+a subjective complaint with nothing to check it against except redoing the
+shape and looking again. `lib/silhouette.py` turns that into a number: a
+threshold against a black background turns the reference and the render
+into a silhouette, and the silhouette into a table of "width at such-and-
+such a fraction of height".
 
 ```python
 import silhouette
 
-# доли высоты — предметные, ваш проект, не библиотека
+# height fractions are subject-specific — your project, not the library
 FRACTIONS = {"shoulder": 0.13, "waist": 0.30, "hip": 0.45, "ankle": 0.88}
 
 ref = silhouette.profile("references/front.png", FRACTIONS)
 silhouette.flat_render("/tmp/render.png")
 mine = silhouette.profile("/tmp/render.png", FRACTIONS)
-print(silhouette.compare(ref, mine))   # {"shoulder": -3.2, "waist": 22.4, ...} — в процентах
+print(silhouette.compare(ref, mine))   # {"shoulder": -3.2, "waist": 22.4, ...} — percent
 ```
 
-`flat_render()` сам ставит анфас, орто-камеру и плоский белый материал
-на текущую сцену (`build.py` уже собран) и возвращает всё как было после
-рендера — вызывать можно прямо из своего `make.py`, не отдельным скриптом.
+`flat_render()` sets up a frontal view, an ortho camera, and a flat white
+material on the current scene itself (`build.py` is already assembled),
+and returns everything to how it was after the render — you can call it
+straight from your own `make.py`, no separate script needed.
 
-**Ваше слово:** ничего, это авто-проверка. Большой процент по одной метке —
-сигнал вернуться к шагу 1 раньше, чем к нему привыкнет глаз, а не после того,
-как под форму лягут материалы и свет.
+**Your word:** nothing, this is an auto-check. A large percentage on a
+single label is a signal to go back to step 1 before the eye gets used to
+it, not after materials and light have settled on top of the shape.
 
-> **Это не проверка 3D-формы**, только плоского силуэта анфас — дешёвый ранний
-> сигнал, а не замена шагу 2 и финальному просмотру. И это не повод класть
-> референс на что попало: согнутая поза или референс, снятый с другой
-> дистанции, дадут другой профиль независимо от того, насколько точно
-> сделана геометрия — смотрите [LIMITS.md](LIMITS.md#проверка-пропорций-silhouette).
+> **This is not a 3D-shape check**, only a flat frontal silhouette — a
+> cheap early signal, not a replacement for step 2 or the final review.
+> Nor is it license to pair the reference with just anything: a bent pose
+> or a reference shot from a different distance will give a different
+> profile regardless of how accurate the geometry is — see
+> [LIMITS.md](LIMITS.md#proportion-check-silhouette).
 
-### Несколько ракурсов вместо одного анфаса
+### Several angles instead of one frontal view
 
-Для органических и непростых форм одного анфаса часто мало: руки прижаты
-к телу в одном референсе и отставлены в другом — разница по объёму, которую
-не видно в одной проекции. `flat_render` принимает `azimuth`/`elevation`
-(как `camera.look_from`) — можно снять профиль ещё и в 3/4, если для
-референса есть снимок того же ракурса:
+For organic and non-trivial shapes, one frontal view is often not enough:
+arms held against the body in one reference and spread in another — a
+volume difference invisible in a single projection. `flat_render` accepts
+`azimuth`/`elevation` (like `camera.look_from`) — you can take a profile
+at a 3/4 view too, if a matching-angle shot exists for the reference:
 
 ```python
-front = silhouette.flat_render("/tmp/front.png")                       # анфас, как раньше
-side = silhouette.flat_render("/tmp/3q.png", azimuth=45, elevation=0)   # тот же приём, другой угол
+front = silhouette.flat_render("/tmp/front.png")                       # frontal, as before
+side = silhouette.flat_render("/tmp/3q.png", azimuth=45, elevation=0)   # same trick, different angle
 ```
 
-Это по-прежнему **не проверка 3D-формы целиком**: несколько плоских проекций
-не заменяют объём, а лишь добавляют ещё один срез. Библиотека не решает,
-какие ракурсы значимы для конкретного предмета — то же самое решение,
-что и с подписями `fractions`.
+This is still **not a full 3D-shape check**: several flat projections
+don't add up to volume, they just add another slice. The library doesn't
+decide which angles matter for a given object — the same kind of decision
+as the `fractions` labels.
 
 ---
 
-## Шаг 2. Ракурс
+## Step 2. Angle
 
-Самое содержательное решение во всём пайплайне: с какой точки смотрим.
-Два пути, выбирайте любой.
+The most substantive decision in the whole pipeline: which point we're
+looking from. Two paths, pick either.
 
-### Путь А — по листу (Blender открывать не нужно)
+### Path A — from the sheet (no need to open Blender)
 
-**Вы видите** тот же `angles.png` с шага 1. Плитки нумеруются слева направо,
-сверху вниз.
+**You see** the same `angles.png` from step 1. Tiles are numbered left to
+right, top to bottom.
 
-**Ваше слово:** «седьмой» или «седьмой, но чуть выше». Номер и высота
-записываются в `shot.py` как `AZIMUTH`, `ELEVATION`, `DISTANCE`, `LENS`.
+**Your word:** "seventh" or "seventh, but a bit higher". The number and
+height get written into `shot.py` as `AZIMUTH`, `ELEVATION`, `DISTANCE`,
+`LENS`.
 
-### Путь Б — крутите сами (нужен открытый Blender)
+### Path B — rotate it yourself (needs Blender open)
 
-Единственное место, где живой Blender даёт то, чего не даёт фон.
+The one place where a live Blender gives you something the background
+mode doesn't.
 
-1. Откройте Blender, загрузите собранную сцену.
-2. Крутите вид мышью, пока не понравится. Это ровно то, что вы умеете
-   без обучения — вращать предмет.
-3. `camera.snap_to_viewport()` ставит рендер-камеру буквально туда, куда
-   вы докрутили, и **возвращает числа**.
-4. Числа переносятся в `shot.py` в константы `CAM_QUAT`, `CAM_EYE`,
-   `VIEW_DISTANCE`, и `USE_VIEWPORT = True`.
+1. Open Blender, load the assembled scene.
+2. Rotate the view with the mouse until you like it. This is exactly what
+   you already know how to do without training — rotate an object.
+3. `camera.snap_to_viewport()` puts the render camera exactly where you
+   ended up, and **returns the numbers**.
+4. The numbers get copied into `shot.py` as the constants `CAM_QUAT`,
+   `CAM_EYE`, `VIEW_DISTANCE`, and `USE_VIEWPORT = True`.
 
-Ракурс из вьюпорта копируется точно, вместе с орто-режимом: если вы крутили
-в ортографическом виде, камера тоже станет ортографической. Перспектива
-не навязывается — в орто вы работали не случайно.
+The angle is copied from the viewport exactly, including ortho mode: if
+you were rotating in orthographic view, the camera becomes orthographic
+too. Perspective isn't forced on you — working in ortho wasn't an accident.
 
-> В фоновом Blender (`-b`) `snap_to_viewport()` **падает с ошибкой**, и это
-> сделано намеренно. Раньше он молча возвращал стартовый ракурс — и на выходе
-> получался кадр, которого никто не выбирал.
+> In headless Blender (`-b`), `snap_to_viewport()` **fails with an error**,
+> on purpose. It used to silently return the startup angle — producing a
+> frame nobody had actually chosen.
 
-**Итог шага:** числа в коде. С этого момента живой Blender больше не нужен
-ни разу — `camera.restore()` собирает ту же камеру из записанных чисел.
+**End of step:** numbers in code. From this point on, a live Blender is
+never needed again — `camera.restore()` rebuilds the same camera from the
+recorded numbers.
 
 ---
 
-## Шаг 3. Материалы
+## Step 3. Materials
 
-**Делает код.** В `sets.py` описаны 4–6 **наборов** материалов. Набор — это
-словарь «слот → материал»: например, «корпус — матовый графит, накладка —
-полированная сталь, ободок — щётка по кругу».
+**The code does this.** `sets.py` describes 4–6 material **sets**. A set
+is a dictionary of "slot → material": for example, "body — matte
+graphite, plate — polished steel, rim — circular brushed metal".
 
-Материалы процедурные: кожа с зерном, нубук, металл с анизотропией
-и радиальной щёткой, пластик с микрорельефом и лаком, стекло, карбон.
-Текстурные файлы не нужны, но если они есть — `materials.pbr_library()`
-подхватит папку с PBR-картами.
+Materials are procedural: grained leather, nubuck, metal with anisotropy
+and a radial brush pattern, plastic with micro-relief and lacquer, glass,
+carbon. Texture files aren't needed, but if you have them —
+`materials.pbr_library()` will pick up a folder of PBR maps.
 
 ```bash
 blender -b --python make.py -- /tmp/out looks
 ```
 
-**Вы видите** `looks.png` — все наборы одной картинкой, с номерами в кадре.
-Важно: наборы показаны **на вашем предмете и вашем ракурсе**, а не на шариках-превью.
-Металл на шарике и металл на плоской накладке выглядят по-разному.
+**You see** `looks.png` — every set in one image, numbered in frame.
+Important: the sets are shown **on your object, at your angle**, not on
+preview spheres. Metal on a sphere and metal on a flat plate look different.
 
-**Ваше слово:** номер набора. Или «третий, но ободок темнее».
+**Your word:** the set number. Or "the third one, but darker rim".
 
-> **Почему наборов 4–6, а не два и не двадцать.** Меньше четырёх — не из чего
-> выбирать, глазу не с чем сравнивать. Больше шести — лист перестаёт читаться,
-> и выбор превращается в лотерею.
+> **Why 4–6 sets, not two, not twenty.** Fewer than four — nothing to
+> choose from, nothing for the eye to compare against. More than six — the
+> sheet stops reading, and the choice turns into a lottery.
 
-Выбранный номер идёт в `shot.py` как `MATERIAL_SET`.
+The chosen number goes into `shot.py` as `MATERIAL_SET`.
 
 ---
 
-## Шаг 4. Свет и кадр
+## Step 4. Light and frame
 
-Здесь пайплайн отличается от ручной работы сильнее всего.
+This is where the pipeline differs most from manual work.
 
-### Кадр считается
+### Frame is computed
 
-`frame.fit()` измеряет габариты предмета в координатах камеры и подгоняет
-охват так, чтобы предмет занял заданную долю кадра:
+`frame.fit()` measures the object's bounding box in camera coordinates and
+adjusts coverage so the object fills a given fraction of the frame:
 
-* `FILL` — доля кадра под предмет. `0.9` — плотно, «предмет распирает кадр».
-  `0.6` — с воздухом, каталожно.
-* `OFFSET` — увод от центра. Предмет не обязан стоять по оси.
-* `FIT_BY` — по какой стороне вписывать. `"max"` — предмет влезает целиком
-  (по умолчанию). `"height"`/`"width"` — вторая сторона может уйти за кадр,
-  это осмысленно, когда обрез задуман.
+* `FILL` — the frame fraction taken by the object. `0.9` — tight, "the
+  object fills the frame". `0.6` — with air, catalog-style.
+* `OFFSET` — shift away from center. The object doesn't have to sit on the
+  axis.
+* `FIT_BY` — which side to fit by. `"max"` — the object fits entirely
+  (default). `"height"`/`"width"` — the other side may run off-frame, which
+  makes sense when a crop is intentional.
 
-В ортографической камере меняется охват, камера остаётся на месте —
-**утверждённый ракурс не портится**. В перспективной камера отъезжает вдоль
-своей оси взгляда: угол зрения задан объективом, менять там нечего, кроме
-дистанции; направление взгляда при этом тоже не меняется.
+In an orthographic camera, coverage changes while the camera stays put —
+**the approved angle isn't disturbed**. In a perspective camera, the camera
+pulls back along its own line of sight: the field of view is set by the
+lens, nothing to change there except distance; the direction of view
+doesn't change either.
 
-### Свет ставится в координатах камеры
+### Light is placed in camera coordinates
 
-Каждый источник задан относительно камеры: x — вправо по кадру, y — вверх,
-камера смотрит вдоль −z. «Источник справа от кадра» означает буквально
-положительный x — **при любом ракурсе**. Поменяли ракурс — свет поехал
-вместе с ним и остался на своих местах в кадре.
+Each light source is defined relative to the camera: x is right across the
+frame, y is up, the camera looks along −z. "A source to the right of frame"
+literally means positive x — **at any angle**. Change the angle, and the
+light travels with it, staying put within the frame.
 
-Размеры и расстояния источников выражены в долях охвата кадра. Это не
-украшательство, а физика: если увеличить и размер источника, и расстояние
-в одно число раз, телесный угол не изменится — значит, не изменится
-и освещённость. Поэтому готовый набор работает на предмете любого размера.
+Source sizes and distances are expressed as fractions of frame coverage.
+This isn't decoration, it's physics: scale both a source's size and its
+distance by the same factor, and the solid angle doesn't change — so
+neither does the illumination. That's why a finished rig works on an
+object of any size.
 
-Готовый набор `lighting.editorial_dark()` — тёмная реклама: узкие полосы
-бликов по рёбрам, световое пятно на фоне, отдельный отражатель для плоской
-глянцевой детали. Для матового предмета или светлого фона берите
-`world_gradient()` + `three_point()`.
+The ready-made rig `lighting.editorial_dark()` is dark advertising style:
+narrow highlight strips along edges, a light patch on the background, a
+separate reflector for a flat glossy part. For a matte object or a bright
+background, use `world_gradient()` + `three_point()`.
 
 ```bash
 blender -b --python make.py -- /tmp/out light
 ```
 
-**Вы видите** `light.png` — один параметр в четырёх значениях, одной картинкой.
-По умолчанию это общая яркость `gain`, но так же перебирается что угодно:
-жёсткость, положение пятна на фоне, доля заполняющего света.
+**You see** `light.png` — one parameter in four values, as a single image.
+By default this is overall brightness (`gain`), but anything can be swept
+this way: hardness, the patch's position on the background, the fraction
+of fill light.
 
-**Ваше слово:** номер варианта. Или словами: «плотнее», «темнее слева»,
-«блик по верхнему ребру уже».
+**Your word:** the variant number. Or in words: "tighter", "darker on the
+left", "the top-edge highlight is too wide".
 
-> Сетка вариантов — самая дешёвая петля во всём пайплайне: четыре кадра
-> 360×480 при 64 сэмплах считаются около 9 секунд. Перебирать варианты
-> **быстрее, чем обсуждать**, какой из них правильный.
+> The variant grid is the cheapest loop in the whole pipeline: four frames
+> at 360×480, 64 samples, render in about 9 seconds. Trying variants is
+> **faster than arguing** about which one is correct.
 
 ---
 
-## Шаг 5. Финальный рендер
+## Step 5. Final render
 
 ```bash
 blender -b --python make.py -- /tmp/out final
 ```
 
-**Делает код.** Полное разрешение, 320 сэмплов, Cycles, и на выходе три файла:
+**The code does this.** Full resolution, 320 samples, Cycles, and three
+output files:
 
-| Файл | Что это |
+| File | What it is |
 |---|---|
-| `final.png` | 16 бит, через AgX — готовая картинка |
-| `final.exr` | 32 бита, линейный, multilayer: 14 пассов |
-| `final.blend` | сцена ровно в том состоянии, что дало картинку |
+| `final.png` | 16-bit, through AgX — the finished picture |
+| `final.exr` | 32-bit, linear, multilayer: 14 passes |
+| `final.blend` | the scene in exactly the state that produced the picture |
 
-Пассы в EXR — это не формальность. Там лежат Depth, Normal, Mist, Ambient
-Occlusion, раздельные Diffuse/Glossy и Cryptomatte по объектам и материалам.
-Cryptomatte даёт **точные маски по объектам** — можно выделить один ободок
-и править только его, не перерендеривая сцену. Depth и Normal нужны, если
-кадр пойдёт в композ или в другую программу.
+The passes in the EXR aren't a formality. They hold Depth, Normal, Mist,
+Ambient Occlusion, separate Diffuse/Glossy, and Cryptomatte by object and
+material. Cryptomatte gives **exact per-object masks** — you can select one
+rim and edit only it, without re-rendering the whole scene. Depth and
+Normal are needed if the frame is headed into compositing or another app.
 
-**Вы видите** готовый кадр в полном размере.
+**You see** the finished frame at full size.
 
-**Ваше слово:** «принято» — либо возврат на шаг 3 или 4. Возврат стоит
-недорого: числа записаны, пересборка идёт одной командой.
+**Your word:** "approved" — or go back to step 3 or 4. Going back is
+cheap: the numbers are recorded, rebuilding is one command.
 
 ---
 
-## Шаг 6. Цветокоррекция
+## Step 6. Color grading
 
-**Делает код** по готовому EXR — **сцена не пересчитывается**:
+**The code does this** from the finished EXR — **the scene isn't
+re-rendered**:
 
 ```bash
 blender -b --python ../lib/post.py -- /tmp/out/final.exr /tmp/out/graded.png
 ```
 
-Свечение от бликов, виньетка, контраст, тональная кривая. Параметры
-передаются прямо в командной строке:
+Bloom from highlights, vignette, contrast, tone curve. Parameters are
+passed right on the command line:
 
 ```bash
 blender -b --python ../lib/post.py -- in.exr out.png vignette=0.3 strength=0.7
 ```
 
-**Вы видите** тот же кадр в другой обработке.
+**You see** the same frame with different processing.
 
-**Ваше слово:** «контрастнее», «убери виньетку», «свечение слишком».
+**Your word:** "more contrast", "remove the vignette", "too much bloom".
 
-> **Это самая дешёвая правка в пайплайне — около секунды.** Поэтому грейд
-> правится сколько угодно раз, и поэтому же не стоит доводить его на шаге 5,
-> запекая в рендер: всё, что можно отложить до EXR, надо отложить до EXR.
-
----
-
-## Сравнение с прошлым и журнал времени
-
-Две вещи, которые `make.py` заготовки делает автоматически, без отдельной
-команды.
-
-**Сравнение с прошлым утверждённым.** Каждый шаг показывает только текущий
-вариант — увидеть, что изменилось после возврата на шаг 3 или 4, до сих пор
-надо было держать в памяти. Конвенция простая: утвердили чекпоинт — сохраните
-его рядом как `<stage>.approved.png` (например, `looks.approved.png` для
-шага 3). При следующем запуске того же шага `make.py` сам положит рядом
-`<stage>.compare.png` («approved»/«new», `lib/mosaic.py:side_by_side`)
-и посчитает грубую разницу (`lib/diff.py:perceptual_diff`) — если она выше
-порога, в консоли будет `WARNING`. Это не perceptual-loss в строгом смысле,
-просто грубая сетка усреднения: мелкий локальный дефект может утонуть,
-а общий сдвиг экспозиции — дать число, хотя глазу он не мешает. Число —
-сигнал посмотреть, не автоматический вердикт.
-
-**Журнал времени.** Каждый запуск `make.py` дописывает строку в
-`OUTDIR/run_log.jsonl` (`lib/telemetry.py`) — сколько заняла стадия. На
-`final` в консоль печатается сводка по всему проекту: суммарное время
-и число вызовов каждой стадии, то есть возвраты на шаг 3/4 видны как счётчик,
-а не как воспоминание о том, сколько раз «переделывали свет».
+> **This is the cheapest edit in the pipeline — about a second.** So the
+> grade gets revised as many times as needed, and for the same reason it
+> shouldn't be finalized at step 5 by baking it into the render: anything
+> that can be deferred to the EXR should be deferred to the EXR.
 
 ---
 
-## Если что-то пошло не так
+## Comparison with the previous shot and time log
 
-| Симптом | Причина |
+Two things the scaffold's `make.py` does automatically, with no separate
+command.
+
+**Comparison with the last approved version.** Each step shows only the
+current variant — seeing what changed after going back to step 3 or 4 used
+to mean holding the previous frame in memory. The convention is simple:
+once you approve a checkpoint, save it alongside as `<stage>.approved.png`
+(e.g. `looks.approved.png` for step 3). On the next run of the same step,
+`make.py` will drop a `<stage>.compare.png` next to it ("approved"/"new",
+`lib/mosaic.py:side_by_side`) and compute a rough difference
+(`lib/diff.py:perceptual_diff`) — if it's above the threshold, you'll get
+a `WARNING` in the console. This isn't a strict perceptual loss, just a
+rough averaging grid: a small local defect can get lost, while an overall
+exposure shift can produce a number even though the eye isn't bothered.
+The number is a signal to look, not an automatic verdict.
+
+**Time log.** Every `make.py` run appends a line to `OUTDIR/run_log.jsonl`
+(`lib/telemetry.py`) — how long the stage took. On `final`, the console
+prints a summary for the whole project: total time and call count per
+stage, so returns to step 3/4 show up as a counter, not as a memory of
+"how many times we redid the light".
+
+---
+
+## If something went wrong
+
+| Symptom | Cause |
 |---|---|
-| В кадре белый куб | `blender -b` без файла грузит **стартовую** сцену — с кубом и лампой. Начинайте `make.py` с `scene.reset()` |
-| Предмет крошечный в углу кадра | В габариты попал лишний объект. `frame.subjects()` отсекает то, чего не видит камера, но ваш собственный меш-реквизит может пройти фильтр — добавьте его в `exclude` |
-| Кадр не тот, что утверждали | Числа взяты из `.blend`, а не из кода. Все утверждённые значения должны быть в `shot.py` |
-| Размытие съело деталь | В орто радиус апертуры равен `lens/(2·fstop)/1000` и **от дистанции не зависит**. Привычные фотографические f/1.2 дают кашу; рабочий диапазон — 2.5…5.0 для общего плана и 8…10 для крупного |
-| Скрипт импортирует сам себя | Каталог скрипта стоит в `sys.path` раньше `lib/`. Не называйте свои файлы `render.py`, `scene.py`, `camera.py` — отсюда и `make.py` |
-| `silhouette.compare` даёт большие расхождения на глаз правильной модели | Референс не на чёрном фоне, снят с другой дистанции/фокусным, или поза не анфас — профиль врёт не по вине геометрии. См. [LIMITS.md](LIMITS.md#проверка-пропорций-silhouette) |
-| Всё сломалось после правки библиотеки | `python3 check.py` — он гоняет все шаги на тестовой сцене и говорит, что именно отвалилось |
+| A white cube in frame | `blender -b` without a file loads the **startup** scene — with a cube and a lamp. Start `make.py` with `scene.reset()` |
+| The object is tiny in a corner of the frame | An extra object got into the bounds. `frame.subjects()` excludes what the camera can't see, but your own mesh prop may slip through the filter — add it to `exclude` |
+| The frame doesn't match what was approved | The numbers came from the `.blend` file, not from code. Every approved value must live in `shot.py` |
+| Blur ate the detail | In ortho, aperture radius equals `lens/(2·fstop)/1000` and **doesn't depend on distance**. Familiar photographic f/1.2 values turn into mush; the working range is 2.5…5.0 for a wide shot and 8…10 for a close-up |
+| The script imports itself | The script's own directory sits in `sys.path` before `lib/`. Don't name your files `render.py`, `scene.py`, `camera.py` — hence `make.py` |
+| `silhouette.compare` gives large discrepancies on a model that looks correct | The reference isn't on a black background, was shot from a different distance/focal length, or the pose isn't frontal — the profile is lying, not the geometry. See [LIMITS.md](LIMITS.md#proportion-check-silhouette) |
+| Everything broke after a library edit | `python3 check.py` — it runs every step on the test scene and tells you exactly what broke |
 
 ---
 
-## Проверка репозитория
+## Repository check
 
 ```bash
 python3 check.py
 ```
 
-Пять стадий: компиляция всех `.py`, сквозной прогон всех шагов внутри
-Blender на тестовой сцене, проверка артефактов на диске, отдельно —
-**чтение получившегося EXR чистым Python, без bpy** — и сборка заготовки
-на дешёвой стадии `preview`. Чтение EXR без Blender не формальность: именно
-так видно, что в файле настоящие пассы, а не один слой RGBA, который Blender
-умеет записать молча.
+Five stages: compiling every `.py` file, an end-to-end run of every step
+inside Blender on the test scene, checking artifacts on disk, and
+separately — **reading the resulting EXR in plain Python, without bpy** —
+and building the scaffold at the cheap `preview` stage. Reading the EXR
+without Blender isn't a formality — it's the only way to see that the file
+holds real passes, not a single RGBA layer, which Blender can write out
+silently.
 
-Тестовая сцена намеренно **не похожа** на заготовку ни формой, ни масштабом
-(около 8 единиц против 3.2, и форма кольцевая вместо сплошной). Если
-библиотека втихую обросла допущениями про конкретный предмет, прогон это
-покажет.
+The test scene is deliberately **unlike** the scaffold in both shape and
+scale (around 8 units vs. 3.2, and ring-shaped instead of solid). If the
+library quietly picked up assumptions about a specific object, this run
+will show it.
 
 ---
 
-## Сколько это стоит по времени
+## How much time this costs
 
 | | |
 |---|---|
-| Проверка пропорций (`silhouette.profile`+`compare`) | ~1 с за референс |
-| Лист ракурсов, 12 плиток | ~40 с |
-| Лист материалов, 6 наборов | ~60 с |
-| Сетка света, 4 варианта | ~9 с |
-| Превью между правками | ~5 с |
-| Финальный кадр, 320 сэмплов | ~30 с |
-| Цветокоррекция по EXR | ~1 с |
-| `check.py` целиком | ~2 мин |
+| Proportion check (`silhouette.profile`+`compare`) | ~1 s per reference |
+| Contact sheet of angles, 12 tiles | ~40 s |
+| Material sheet, 6 sets | ~60 s |
+| Light grid, 4 variants | ~9 s |
+| Preview between edits | ~5 s |
+| Final frame, 320 samples | ~30 s |
+| Color grade from EXR | ~1 s |
+| `check.py` end to end | ~2 min |
 
-Замеры на MacBook, Blender 5.2.0 LTS. Порядок величин важнее точных чисел:
-**все петли обратной связи — секунды и десятки секунд**, поэтому смотреть
-дешевле, чем рассуждать.
+Measured on a MacBook, Blender 5.2.0 LTS. The order of magnitude matters
+more than exact numbers: **every feedback loop is seconds to tens of
+seconds**, so looking is cheaper than reasoning.
 
 ---
 
-Дальше: [LIMITS.md](LIMITS.md) — что этот пайплайн не умеет.
+Next: [LIMITS.md](LIMITS.md) — what this pipeline can't do.
