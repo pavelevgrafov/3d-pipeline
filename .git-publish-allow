@@ -1,0 +1,10 @@
+# Per-repo exceptions to ~/.claude/git-hooks/publish-blocklist.txt.
+# One tracked path per line — silences the "internal, don't publish"
+# warning for that exact file in this repo.
+
+# BACKLOG.md matches the global blocklist by filename, but here it's
+# reader-facing documentation, not a personal scratch file: README.md
+# lists it in the Documentation table and links it from the Changelog.
+# Confirmed by reading its contents (2026-07-27) — a structured product
+# backlog with cost estimates, not a private draft.
+BACKLOG.md
