@@ -8,3 +8,7 @@ _smoke/
 __pycache__/
 *.py[cod]
 .DS_Store
+
+# Ключи API (Meshy и т.п.) — никогда не в репозиторий.
+.secrets/
+.env

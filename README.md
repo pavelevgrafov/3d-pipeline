@@ -1,6 +1,6 @@
 # 3d-pipeline
 
-**Version 1.0**
+**Version 1.1**
 
 A Blender pipeline for advertising product renders **from a description and
 references** — no manual work in the editor UI.
@@ -76,6 +76,7 @@ Library:
 | `post.py` | color grading from a finished EXR |
 | `exr_info.py` | reading passes from EXR in plain Python, without Blender |
 | `mosaic.py` | tiling stitched into one image |
+| `silhouette.py` | proportions vs. a reference, measured — a flat silhouette profile compared by the number, not by eye |
 
 ## Core idea
 
@@ -89,6 +90,15 @@ The practical consequence: **approved numbers live in code, not in the
 `.blend` file**. The scene file may have been saved before you approved a
 look; the numbers reproduce the shot every time — headless, on another
 machine, six months later.
+
+## Changelog
+
+**1.1** — added `lib/silhouette.py`: an optional early checkpoint that
+measures an object's silhouette against a reference numerically (percent
+diff per height fraction) instead of relying on "looks off" — see
+[GUIDE.md, step 1.5](GUIDE.md#шаг-15-пропорции-по-желанию).
+
+**1.0** — first public release: `lib/`, `template/`, `check.py`.
 
 ## License
 

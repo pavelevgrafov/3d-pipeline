@@ -29,6 +29,7 @@ import materials   # noqa: E402
 import mosaic      # noqa: E402
 import post        # noqa: E402
 import render      # noqa: E402
+import silhouette  # noqa: E402
 import variants    # noqa: E402
 
 RESULTS = []
@@ -393,6 +394,63 @@ def main():
         p = render.preview(out("preview.png"), res=(120, 160), samples=8)
         assert os.path.exists(p)
         return {"bytes": os.path.getsize(p)}
+
+    # --- проверка пропорций: силуэт референса и модели, числом -------------
+    @check("silhouette.profile+ui_bar_filter")
+    def _():
+        def wedge(path, ui_bar):
+            """Клин на чёрном фоне: ширина растёт сверху вниз — известный,
+            монотонный профиль, по которому видно, испортил ли UI-бар число.
+            """
+            w, h = 40, 60
+            img = bpy.data.images.new("test_sil", w, h, alpha=False)
+            # Alpha=1 обязателен по всей картинке: PNG пишется с премультипликацией
+            # альфы, и нулевая альфа молча топит белый цвет в чёрный при сохранении.
+            px = [0.0, 0.0, 0.0, 1.0] * (w * h)
+            for disp_row in range(5, 55):
+                t = (disp_row - 5) / 49
+                half = 3 + round(12 * t)
+                y = h - 1 - disp_row              # хранение пикселей снизу вверх
+                for x in range(w // 2 - half, w // 2 + half):
+                    base = y * w * 4 + x * 4
+                    px[base:base + 3] = [1.0, 1.0, 1.0]
+            if ui_bar:
+                # Нижняя строка картинки во всю ширину — скраббер поверх скриншота.
+                for x in range(w):
+                    base = x * 4
+                    px[base:base + 3] = [1.0, 1.0, 1.0]
+            img.pixels = px
+            img.filepath_raw = path
+            img.file_format = "PNG"
+            img.save()
+            bpy.data.images.remove(img)
+
+        clean, dirty = out("_sil_clean.png"), out("_sil_dirty.png")
+        wedge(clean, ui_bar=False)
+        wedge(dirty, ui_bar=True)
+
+        p_clean, p_dirty = silhouette.profile(clean), silhouette.profile(dirty)
+        # Без фильтра нижние доли "dirty" читались бы как полная ширина
+        # картинки вместо края клина — расхождение было бы огромным.
+        worst = max(abs(p_dirty[k] - p_clean[k]) for k in p_clean if p_clean[k] is not None)
+        assert worst < 0.05, f"UI-бар просочился в профиль: расхождение {worst:.3f}"
+        vals = [p_clean[f"{f}%"] for f in (5, 25, 45, 65, 85)]
+        assert vals == sorted(vals), f"профиль клина не монотонен: {vals}"
+        return {"worst_diff": round(worst, 4), "vals": [round(v, 3) for v in vals]}
+
+    @check("silhouette.flat_render+compare")
+    def _():
+        path = silhouette.flat_render(out("_sil_render.png"), res=(80, 140))
+        assert os.path.exists(path) and os.path.getsize(path) > 0
+        prof = silhouette.profile(path)
+        assert any(v is not None for v in prof.values()), "пустой профиль рендера"
+        same = silhouette.compare(prof, prof)
+        assert all(v == 0 for v in same.values() if v is not None), \
+            f"compare(x, x) обязан давать нули: {same}"
+        # Материалы и мир — временная подмена ради силуэта, а не побочный эффект.
+        mats = [m.name for m in bpy.data.objects["Body"].data.materials]
+        assert mats and mats[0] != "_SilhouetteFlat", f"материал не восстановлен: {mats}"
+        return {"labels": len(prof), "45%": prof.get("45%")}
 
     # --- шаг 6: пост --------------------------------------------------------
     @check("post.run")
